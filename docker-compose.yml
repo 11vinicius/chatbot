@@ -1,0 +1,14 @@
+services:
+  chatbot:
+    build: .
+    container_name: chatboot
+    restart: unless-stopped
+    environment:
+      - CLEAR_WWEBJS=true
+      - TZ=America/Sao_Paulo
+      - PUPPETEER_SKIP_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    shm_size: "1gb"
+    volumes:
+      - ./.wwebjs_auth_docker:/app/.wwebjs_auth
+      - ./.wwebjs_cache_docker:/app/.wwebjs_cache
