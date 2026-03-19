@@ -2,10 +2,10 @@
 // IMPORTAÇÕES
 // =====================================
 const qrcode = require("qrcode-terminal");
-const { Client, MessageMedia, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth } = require("whatsapp-web.js");
 
 // =====================================
-// CONFIGURAÇÃO DO CLIENTE
+// CLIENTE
 // =====================================
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -25,19 +25,19 @@ const client = new Client({
 // QR CODE
 // =====================================
 client.on("qr", (qr) => {
-  console.log("📲 Escaneie o QR Code abaixo:");
+  console.log("📲 Escaneie o QR Code:");
   qrcode.generate(qr, { small: true });
 });
 
 // =====================================
-// WHATSAPP CONECTADO
+// READY
 // =====================================
 client.on("ready", () => {
-  console.log("✅ Tudo certo! WhatsApp conectado.");
+  console.log("✅ WhatsApp conectado!");
 });
 
 // =====================================
-// DESCONEXÃO
+// DESCONECTADO
 // =====================================
 client.on("disconnected", (reason) => {
   console.log("⚠️ Desconectado:", reason);
@@ -49,63 +49,87 @@ client.on("disconnected", (reason) => {
 client.initialize();
 
 // =====================================
-// FUNÇÃO DE DELAY
+// DELAY
 // =====================================
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 // =====================================
-// FUNIL DE MENSAGENS (SOMENTE PRIVADO)
+// CONTROLE DE ATENDIMENTO
+// =====================================
+const atendidos = new Map();
+const TEMPO_RESET = 1000 * 60 * 10; // 10 minutos
+
+// =====================================
+// FUNIL
 // =====================================
 client.on("message", async (msg) => {
   try {
-    // ❌ IGNORA QUALQUER COISA QUE NÃO SEJA CONVERSA PRIVADA
     if (!msg.from || msg.from.endsWith("@g.us")) return;
 
     const chat = await msg.getChat();
-    if (chat.isGroup) return; // blindagem extra
+    if (chat.isGroup) return;
 
-    const texto = msg.body ? msg.body.trim().toLowerCase() : "";
+    const numero = msg.from;
+    const texto = (msg.body || "").trim().toLowerCase();
 
-    // Função de digitação
-    const typing = async () => {
-      await delay(2000);
+    const agora = Date.now();
+    const ultimo = atendidos.get(numero);
+
+    const primeiraInteracao =
+      !ultimo || agora - ultimo > TEMPO_RESET;
+
+    // simula digitação
+    const typing = async (tempo = 1500) => {
       await chat.sendStateTyping();
-      await delay(2000);
+      await delay(tempo);
     };
 
     // =====================================
-    // MENSAGEM INICIAL
+    // HORÁRIO
     // =====================================
-    if (/^(menu|oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(texto)) {
+    const data = new Date();
+    const hora = data.getHours();
+    const minuto = data.getMinutes();
+
+    const aberto = (hora > 18) || (hora === 18 && minuto >= 30);
+
+    // =====================================
+    // FORA DO HORÁRIO
+    // =====================================
+    if (!aberto && primeiraInteracao) {
+      atendidos.set(numero, agora);
 
       await typing();
 
-      const agora = new Date();
-      const hora = agora.getHours();
-      const minuto = agora.getMinutes();
+      await client.sendMessage(
+        numero,
+        `🍕 *JET PIZZA DELIVERY*
 
-      const aberto = (hora > 18) || (hora === 18 && minuto >= 30);
+😄 Olá!
 
-      // 🚫 FORA DO HORÁRIO
-      if (!aberto) {
-        await client.sendMessage(
-          msg.from,
-          `🍕 *JET PIZZA DELIVERY* 🍕
-    
-    😄 Olá!
-    
-    No momento estamos fechados.
-    
-    🕐 Nosso atendimento começa a partir das *18:30*.\n
-    
-    Já já estaremos prontos pra te atender com pizzas quentinhas e deliciosas 🔥🍕\n
-    
-    Aguarde a gente 😉`
-        );
-        return; // 🔥 IMPORTANTE: para aqui
-      }
+No momento estamos fechados.
 
-      // ✅ DENTRO DO HORÁRIO
+🕐 Abrimos às *18:30*.
+
+🔥 Já já estaremos com pizzas quentinhas!
+
+Segura a fome aí 😅🍕`
+      );
+
+      return;
+    }
+
+    // =====================================
+    // DENTRO DO HORÁRIO (PRIMEIRA INTERAÇÃO)
+    // =====================================
+    if (
+      /^(menu|oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(texto) &&
+      primeiraInteracao
+    ) {
+      atendidos.set(numero, agora);
+
+      await typing();
+
       let saudacao = "Olá";
 
       if (hora >= 5 && hora < 12) saudacao = "Bom dia";
@@ -113,31 +137,44 @@ client.on("message", async (msg) => {
       else saudacao = "Boa noite";
 
       await client.sendMessage(
-        msg.from,
-        `🍕 *JET PIZZA DELIVERY* 🍕
-    
-    ${saudacao}! 👋
-    
-    Que bom ter você por aqui 😄
-    
-    🔥 Trabalhamos com pizzas quentinhas, recheio caprichado e entrega rápida!
-    
-    📋 *Confira nosso cardápio e faça seu pedido:*
-    👉 https://viniviegas.com.br/
-    
-    💥 Promoções do dia podem estar rolando!
-    Fica de olho 👀
-    
-    🕐 Atendimento rápido
-    🚀 Entrega ágil
-    ❤️ Feito com qualidade
-    
-    Se precisar, é só mandar mensagem aqui 😉`
+        numero,
+        `🍕 *JET PIZZA DELIVERY*
+
+${saudacao}! 👋
+
+😄 Bem-vindo!
+
+🔥 Pizzas quentinhas
+🧀 Recheio caprichado
+🚀 Entrega rápida
+
+📋 Cardápio:
+👉 https://viniviegas.com.br/
+
+💥 Fica de olho no status 👀
+
+Se quiser pedir, só mandar aqui 😉`
       );
+
+      return;
     }
 
+    // =====================================
+    // FALLBACK
+    // =====================================
+    await typing(1000);
 
-  } catch (error) {
-    console.error("❌ Erro no processamento da mensagem:", error);
+    await client.sendMessage(
+      numero,
+      `😄 Já tô por aqui!
+
+📋 Cardápio:
+👉 https://viniviegas.com.br/
+
+Me fala o que você quer 🍕`
+    );
+
+  } catch (err) {
+    console.error("❌ Erro:", err);
   }
 });
