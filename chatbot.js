@@ -4,6 +4,8 @@
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 
+
+
 // =====================================
 // CLIENTE
 // =====================================
@@ -64,7 +66,12 @@ const TEMPO_RESET = 1000 * 60 * 10; // 10 minutos
 // =====================================
 client.on("message", async (msg) => {
   try {
-    if (!msg.from || msg.from.endsWith("@g.us")) return;
+    if (
+      msg.fromMe ||
+      msg.from === "status@broadcast" ||
+      msg.from?.endsWith("@g.us")
+    ) return;
+
 
     const chat = await msg.getChat();
     if (chat.isGroup) return;
@@ -84,36 +91,42 @@ client.on("message", async (msg) => {
       await delay(tempo);
     };
 
-    // =====================================
-    // HORÁRIO
-    // =====================================
+    //     // =====================================
+    //     // HORÁRIO
+    //     // =====================================
     const data = new Date();
     const hora = data.getHours();
     const minuto = data.getMinutes();
 
     const aberto = (hora > 18) || (hora === 18 && minuto >= 30);
 
-    // =====================================
-    // FORA DO HORÁRIO
-    // =====================================
+    //     // =====================================
+    //     // FORA DO HORÁRIO
+    //     // =====================================
     if (!aberto && primeiraInteracao) {
       atendidos.set(numero, agora);
 
       await typing();
-
       await client.sendMessage(
         numero,
-        `🍕 *JET PIZZA DELIVERY*
-
-😄 Olá!
-
-No momento estamos fechados.
-
-🕐 Abrimos às *18:30*.
-
-🔥 Já já estaremos com pizzas quentinhas!
-
-Segura a fome aí 😅🍕`
+        `
+        🍕 *JET PIZZA DELIVERY*
+      
+        😄 Olá!
+        
+        No momento estamos fechados.
+        
+        🕐 Abrimos às *18:30*.
+        
+        🔥 Já já estaremos com pizzas quentinhas!
+        
+        👉 Enquanto isso, acompanha a gente no Instagram:
+        https://instagram.com/seuusuario
+        
+        👀 Postamos promoções e novidades por lá!
+        
+        Segura a fome aí 😅🍕
+        `
       );
 
       return;
@@ -138,41 +151,75 @@ Segura a fome aí 😅🍕`
 
       await client.sendMessage(
         numero,
-        `🍕 *JET PIZZA DELIVERY*
+        `
+        🍕 *JET PIZZA DELIVERY*
 
-${saudacao}! 👋
+        ${saudacao}! 👋
 
-😄 Bem-vindo!
+        😄 Bem-vindo!
 
-🔥 Pizzas quentinhas
-🧀 Recheio caprichado
-🚀 Entrega rápida
+        🔥 Pizzas quentinhas
+        🧀 Recheio caprichado
+        🚀 Entrega rápida
 
-📋 Cardápio:
-👉 https://viniviegas.com.br/
+        📋 Cardápio:
+        👉 https://viniviegas.com.br/
 
-💥 Fica de olho no status 👀
+        💥 Fica de olho no status 👀
 
-Se quiser pedir, só mandar aqui 😉`
+        Se quiser pedir, só mandar aqui 😉
+        `
       );
 
       return;
     }
 
-    // =====================================
-    // FALLBACK
-    // =====================================
+
+    if (texto.includes("total") &&
+      texto.includes("pedido") &&
+      texto.includes("itens")) {
+      await typing();
+
+      await client.sendMessage(
+        numero,
+        `
+        🧾 *PEDIDO CONFIRMADO!*
+        
+        🍕 Perfeito! Seu pedido foi recebido com sucesso!
+          
+        🚀 Já estamos preparando tudo com muito capricho
+        🔥 Sua pizza sai quentinha direto do forno
+          
+        ⏱ *Tempo médio de preparo e entrega: 60 a 90 minutos*
+          
+        🙏 Obrigado pela preferência!
+          
+        📲 Aproveita e segue a gente no Instagram pra não perder promoções:
+        👉 https://www.instagram.com/_viniciuslemes/
+          
+        💥 Sempre postamos ofertas exclusivas por lá 👀
+        `
+      );
+
+      return;
+    }
+
+    //     // =====================================
+    //     // FALLBACK
+    //     // =====================================
     await typing(1000);
 
-    await client.sendMessage(
-      numero,
-      `😄 Já tô por aqui!
+    // await client.sendMessage(
+    //   numero,
+    //   `
+    //   😄 Já tô por aqui!
 
-📋 Cardápio:
-👉 https://viniviegas.com.br/
+    //     📋 Cardápio:
+    //     👉 https://viniviegas.com.br/
 
-Me fala o que você quer 🍕`
-    );
+    //     Me fala o que você quer 🍕
+    //   `
+    // );
 
   } catch (err) {
     console.error("❌ Erro:", err);
