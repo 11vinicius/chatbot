@@ -121,7 +121,8 @@ client.on("message", async (msg) => {
         🔥 Já já estaremos com pizzas quentinhas!
         
         👉 Enquanto isso, acompanha a gente no Instagram:
-        https://instagram.com/seuusuario
+         https://www.instagram.com/_viniciuslemes/
+
         
         👀 Postamos promoções e novidades por lá!
         
