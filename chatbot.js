@@ -3,8 +3,7 @@
 // =====================================
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-
-
+const pool = require("./db"); // Conexão com Postgres
 
 // =====================================
 // CLIENTE
@@ -72,7 +71,6 @@ client.on("message", async (msg) => {
       msg.from?.endsWith("@g.us")
     ) return;
 
-
     const chat = await msg.getChat();
     if (chat.isGroup) return;
 
@@ -81,31 +79,23 @@ client.on("message", async (msg) => {
 
     const agora = Date.now();
     const ultimo = atendidos.get(numero);
+    const primeiraInteracao = !ultimo || agora - ultimo > TEMPO_RESET;
 
-    const primeiraInteracao =
-      !ultimo || agora - ultimo > TEMPO_RESET;
-
-    // simula digitação
     const typing = async (tempo = 1500) => {
       await chat.sendStateTyping();
       await delay(tempo);
     };
 
-    //     // =====================================
-    //     // HORÁRIO
-    //     // =====================================
     const data = new Date();
     const hora = data.getHours();
     const minuto = data.getMinutes();
+    const aberto = hora > 18 || (hora === 18 && minuto >= 30);
 
-    const aberto = (hora > 18) || (hora === 18 && minuto >= 30);
-
-    //     // =====================================
-    //     // FORA DO HORÁRIO
-    //     // =====================================
+    // =====================================
+    // FORA DO HORÁRIO
+    // =====================================
     if (!aberto && primeiraInteracao) {
       atendidos.set(numero, agora);
-
       await typing();
       await client.sendMessage(
         numero,
@@ -123,29 +113,22 @@ client.on("message", async (msg) => {
         👉 Enquanto isso, acompanha a gente no Instagram:
          https://www.instagram.com/_viniciuslemes/
 
-        
         👀 Postamos promoções e novidades por lá!
         
         Segura a fome aí 😅🍕
         `
       );
-
       return;
     }
 
     // =====================================
-    // DENTRO DO HORÁRIO (PRIMEIRA INTERAÇÃO)
+    // MENSAGEM INICIAL DENTRO DO HORÁRIO
     // =====================================
-    if (
-      /^(menu|oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(texto) &&
-      primeiraInteracao
-    ) {
+    if (/^(menu|oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(texto) && primeiraInteracao) {
       atendidos.set(numero, agora);
-
       await typing();
 
       let saudacao = "Olá";
-
       if (hora >= 5 && hora < 12) saudacao = "Bom dia";
       else if (hora < 18) saudacao = "Boa tarde";
       else saudacao = "Boa noite";
@@ -171,15 +154,25 @@ client.on("message", async (msg) => {
         Se quiser pedir, só mandar aqui 😉
         `
       );
-
       return;
     }
 
-
-    if (texto.includes("total") &&
-      texto.includes("pedido") &&
-      texto.includes("itens")) {
+    // =====================================
+    // CONFIRMAÇÃO DE PEDIDO
+    // =====================================
+    if (texto.includes("total") && texto.includes("pedido") && texto.includes("itens")) {
       await typing();
+
+      // Atualiza/insere pedido no Postgres
+      await pool.query(
+        `
+        INSERT INTO pedidos(numero, quantidade)
+        VALUES($1, 1)
+        ON CONFLICT (numero)
+        DO UPDATE SET quantidade = pedidos.quantidade + 1;
+        `,
+        [numero]
+      );
 
       await client.sendMessage(
         numero,
@@ -205,22 +198,10 @@ client.on("message", async (msg) => {
       return;
     }
 
-    //     // =====================================
-    //     // FALLBACK
-    //     // =====================================
+    // =====================================
+    // FALLBACK
+    // =====================================
     await typing(1000);
-
-    // await client.sendMessage(
-    //   numero,
-    //   `
-    //   😄 Já tô por aqui!
-
-    //     📋 Cardápio:
-    //     👉 https://viniviegas.com.br/
-
-    //     Me fala o que você quer 🍕
-    //   `
-    // );
 
   } catch (err) {
     console.error("❌ Erro:", err);
