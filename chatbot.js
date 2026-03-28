@@ -65,20 +65,26 @@ const TEMPO_RESET = 1000 * 60 * 10; // 10 minutos
 // =====================================
 client.on("message", async (msg) => {
   try {
+    // Ignora mensagens do próprio bot, status e grupos
     if (
       msg.fromMe ||
       msg.from === "status@broadcast" ||
-      msg.from?.endsWith("@g.us")
+      msg.from.endsWith("@g.us")
     ) return;
 
     const chat = await msg.getChat();
-    if (chat.isGroup) return;
 
-    const numero = msg.from;
+    // --- CORREÇÃO AQUI: PEGANDO NOME E NÚMERO REAL ---
+    const contact = await msg.getContact();
+    const numeroRaw = msg.from; // ID completo (ex: 5511999999999@c.us)
+    const numeroSocio = numeroRaw.split('@')[0]; // Apenas os números
+    const nomeContato = contact.pushname || contact.name || "Cliente";
+    const celular = contact.number;
+    // ------------------------------------------------
+
     const texto = (msg.body || "").trim().toLowerCase();
-
     const agora = Date.now();
-    const ultimo = atendidos.get(numero);
+    const ultimo = atendidos.get(numeroRaw);
     const primeiraInteracao = !ultimo || agora - ultimo > TEMPO_RESET;
 
     const typing = async (tempo = 1500) => {
@@ -89,33 +95,35 @@ client.on("message", async (msg) => {
     const data = new Date();
     const hora = data.getHours();
     const minuto = data.getMinutes();
+
+    // Horário de funcionamento: Aberto após as 18:30
     const aberto = hora > 18 || (hora === 18 && minuto >= 30);
 
     // =====================================
     // FORA DO HORÁRIO
     // =====================================
     if (!aberto && primeiraInteracao) {
-      atendidos.set(numero, agora);
+      atendidos.set(numeroRaw, agora);
       await typing();
       await client.sendMessage(
-        numero,
+        numeroRaw,
         `
-        🍕 *JET PIZZA DELIVERY*
+🍕 *JET PIZZA DELIVERY*
       
-        😄 Olá!
+😄 Olá, *${nomeContato}*!
         
-        No momento estamos fechados.
+No momento estamos fechados.
         
-        🕐 Abrimos às *18:30*.
+🕐 Abrimos às *18:30*.
         
-        🔥 Já já estaremos com pizzas quentinhas!
+🔥 Já já estaremos com pizzas quentinhas!
         
-        👉 Enquanto isso, acompanha a gente no Instagram:
-         https://www.instagram.com/_viniciuslemes/
+👉 Enquanto isso, acompanha a gente no Instagram:
+https://www.instagram.com/_viniciuslemes/
 
-        👀 Postamos promoções e novidades por lá!
+👀 Postamos promoções e novidades por lá!
         
-        Segura a fome aí 😅🍕
+Segura a fome aí 😅🍕
         `
       );
       return;
@@ -125,7 +133,7 @@ client.on("message", async (msg) => {
     // MENSAGEM INICIAL DENTRO DO HORÁRIO
     // =====================================
     if (/^(menu|oi|olá|ola|bom dia|boa tarde|boa noite)$/i.test(texto) && primeiraInteracao) {
-      atendidos.set(numero, agora);
+      atendidos.set(numeroRaw, agora);
       await typing();
 
       let saudacao = "Olá";
@@ -134,24 +142,24 @@ client.on("message", async (msg) => {
       else saudacao = "Boa noite";
 
       await client.sendMessage(
-        numero,
+        numeroRaw,
         `
-        🍕 *JET PIZZA DELIVERY*
+🍕 *JET PIZZA DELIVERY*
 
-        ${saudacao}! 👋
+${saudacao}, *${nomeContato}*! 👋
 
-        😄 Bem-vindo!
+😄 Bem-vindo!
 
-        🔥 Pizzas quentinhas
-        🧀 Recheio caprichado
-        🚀 Entrega rápida
+🔥 Pizzas quentinhas
+🧀 Recheio caprichado
+🚀 Entrega rápida
 
-        📋 Cardápio:
-        👉 https://viniviegas.com.br/
+📋 Cardápio:
+👉 https://viniviegas.com.br/
 
-        💥 Fica de olho no status 👀
+💥 Fica de olho no status 👀
 
-        Se quiser pedir, só mandar aqui 😉
+Se quiser pedir, só mandar aqui 😉
         `
       );
       return;
@@ -160,50 +168,51 @@ client.on("message", async (msg) => {
     // =====================================
     // CONFIRMAÇÃO DE PEDIDO
     // =====================================
-    if (texto.includes("total") && texto.includes("pedido") && texto.includes("itens")) {
+    // Nota: O fallback do pedido geralmente vem de sistemas externos ou palavras-chave específicas
+    if (texto.includes("total") && texto.includes("pedido")) {
       await typing();
 
-      // Atualiza/insere pedido no Postgres
+      // Salva no Postgres usando o número limpo e o nome capturado
       await pool.query(
         `
-        INSERT INTO pedidos(numero, quantidade)
-        VALUES($1, 1)
+        INSERT INTO pedidos(numero, nome, quantidade)
+        VALUES($1, $2, 1)
         ON CONFLICT (numero)
-        DO UPDATE SET quantidade = pedidos.quantidade + 1;
+        DO UPDATE 
+          SET quantidade = pedidos.quantidade + 1,
+              nome = EXCLUDED.nome;
         `,
-        [numero]
+        [celular, nomeContato]
       );
 
       await client.sendMessage(
-        numero,
+        numeroRaw,
         `
-        🧾 *PEDIDO CONFIRMADO!*
+🧾 *PEDIDO CONFIRMADO!*
         
-        🍕 Perfeito! Seu pedido foi recebido com sucesso!
+🍕 Perfeito, *${nomeContato}*! Seu pedido foi recebido com sucesso!
           
-        🚀 Já estamos preparando tudo com muito capricho
-        🔥 Sua pizza sai quentinha direto do forno
+🚀 Já estamos preparando tudo com muito capricho
+🔥 Sua pizza sai quentinha direto do forno
           
-        ⏱ *Tempo médio de preparo e entrega: 60 a 90 minutos*
+⏱ *Tempo médio de preparo e entrega: 60 a 90 minutos*
           
-        🙏 Obrigado pela preferência!
+🙏 Obrigado pela preferência!
           
-        📲 Aproveita e segue a gente no Instagram pra não perder promoções:
-        👉 https://www.instagram.com/_viniciuslemes/
+📲 Aproveita e segue a gente no Instagram pra não perder promoções:
+👉 https://www.instagram.com/_viniciuslemes/
           
-        💥 Sempre postamos ofertas exclusivas por lá 👀
+💥 Sempre postamos ofertas exclusivas por lá 👀
         `
       );
 
       return;
     }
 
-    // =====================================
-    // FALLBACK
-    // =====================================
-    await typing(1000);
+    // Fallback silencioso para não interromper a conversa manual
+    // await typing(500);
 
   } catch (err) {
-    console.error("❌ Erro:", err);
+    console.error("❌ Erro no processamento da mensagem:", err);
   }
 });
