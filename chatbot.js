@@ -77,7 +77,6 @@ client.on("message", async (msg) => {
     // --- CORREÇÃO AQUI: PEGANDO NOME E NÚMERO REAL ---
     const contact = await msg.getContact();
     const numeroRaw = msg.from; // ID completo (ex: 5511999999999@c.us)
-    const numeroSocio = numeroRaw.split('@')[0]; // Apenas os números
     const nomeContato = contact.pushname || contact.name || "Cliente";
     const celular = contact.number;
     // ------------------------------------------------
@@ -124,6 +123,17 @@ https://www.instagram.com/_viniciuslemes/
         
 Segura a fome aí 😅🍕
         `
+      );
+
+      await pool.query(
+        `
+        INSERT INTO pedidos(numero, nome)
+        VALUES($1, $2)
+        ON CONFLICT (numero)
+        DO UPDATE 
+          SET nome = EXCLUDED.nome;
+        `,
+        [celular, nomeContato]
       );
       return;
     }
