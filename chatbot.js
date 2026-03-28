@@ -97,8 +97,7 @@ client.on("message", async (msg) => {
     const minuto = data.getMinutes();
 
     // Horário de funcionamento: Aberto após as 18:30
-    const aberto = hora > 18 || (hora === 18 && minuto >= 30);
-
+    const aberto = (hora === 18 && minuto >= 30) || (hora > 18 && hora <= 23);
     // =====================================
     // FORA DO HORÁRIO
     // =====================================
