@@ -4,7 +4,10 @@
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const pool = require("./db");
-const { imprimirPedido } = require("./imprimi");
+const { processarFila } = require("./fila");
+
+
+setInterval(processarFila, 5000);
 
 // =====================================
 // CLIENTE
@@ -101,43 +104,43 @@ client.on("message", async (msg) => {
     // =====================================
     // FORA DO HORÁRIO
     // =====================================
-    //     if (!aberto && primeiraInteracao) {
-    //       atendidos.set(numeroRaw, agora);
-    //       await typing();
-    //       await client.sendMessage(
-    //         numeroRaw,
-    //         `
-    // 🍕 *JET PIZZA DELIVERY*
+    if (!aberto && primeiraInteracao) {
+      atendidos.set(numeroRaw, agora);
+      await typing();
+      await client.sendMessage(
+        numeroRaw,
+        `
+    🍕 *JET PIZZA DELIVERY*
 
-    // 😄 Olá, *${nomeContato}*!
+    😄 Olá, *${nomeContato}*!
 
-    // No momento estamos fechados.
+    No momento estamos fechados.
 
-    // 🕐 Abrimos às *18:30*.
+    🕐 Abrimos às *18:30*.
 
-    // 🔥 Já já estaremos com pizzas quentinhas!
+    🔥 Já já estaremos com pizzas quentinhas!
 
-    // 👉 Enquanto isso, acompanha a gente no Instagram:
-    // https://www.instagram.com/_viniciuslemes/
+    👉 Enquanto isso, acompanha a gente no Instagram:
+    https://www.instagram.com/_viniciuslemes/
 
-    // 👀 Postamos promoções e novidades por lá!
+    👀 Postamos promoções e novidades por lá!
 
-    // Segura a fome aí 😅🍕
-    //         `
-    //       );
+    Segura a fome aí 😅🍕
+            `
+      );
 
-    // await pool.query(
-    //   `
-    //     INSERT INTO pedidos(numero, nome)
-    //     VALUES($1, $2)
-    //     ON CONFLICT (numero)
-    //     DO UPDATE 
-    //       SET nome = EXCLUDED.nome;
-    //     `,
-    //   [celular, nomeContato]
-    // );
-    // return;
-    // }
+      await pool.query(
+        `
+        INSERT INTO pedidos(numero, nome)
+        VALUES($1, $2)
+        ON CONFLICT (numero)
+        DO UPDATE 
+          SET nome = EXCLUDED.nome;
+        `,
+        [celular, nomeContato]
+      );
+      return;
+    }
 
     // =====================================
     // MENSAGEM INICIAL DENTRO DO HORÁRIO
@@ -178,11 +181,10 @@ Se quiser pedir, só mandar aqui 😉
     // =====================================
     // CONFIRMAÇÃO DE PEDIDO
     // =====================================
-    // Nota: O fallback do pedido geralmente vem de sistemas externos ou palavras-chave específicas
     if (texto.includes("total") && texto.includes("pedido")) {
       await typing();
 
-      // Salva no Postgres usando o número limpo e o nome capturado
+      // Salva no Postgres
       await pool.query(
         `
         INSERT INTO pedidos(numero, nome, quantidade)
@@ -211,7 +213,11 @@ Se quiser pedir, só mandar aqui 😉
         ${new Date().toLocaleString()}
         `;
 
-      imprimirPedido(conteudoImpressao);
+      // APLICAÇÃO DO JOB: Insere na fila para o Worker imprimir
+      await pool.query(
+        `INSERT INTO fila_impressao (conteudo) VALUES ($1)`,
+        [conteudoImpressao]
+      );
 
       await client.sendMessage(
         numeroRaw,
@@ -244,7 +250,3 @@ Se quiser pedir, só mandar aqui 😉
     console.error("❌ Erro no processamento da mensagem:", err);
   }
 });
-
-
-
-
