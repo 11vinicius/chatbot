@@ -3,7 +3,8 @@
 // =====================================
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth } = require("whatsapp-web.js");
-const pool = require("./db"); // Conexão com Postgres
+const pool = require("./db");
+const { imprimirPedido } = require("./imprimi");
 
 // =====================================
 // CLIENTE
@@ -246,56 +247,4 @@ Se quiser pedir, só mandar aqui 😉
 
 
 
-const net = require('net');
-const iconv = require('iconv-lite'); // Importa a biblioteca
 
-const IP_ANDROID = '192.168.0.18';
-const PORTA = 9100;
-
-function imprimirPedido(texto) {
-  const socket = new net.Socket();
-  socket.setTimeout(5000);
-
-  socket.connect(PORTA, IP_ANDROID, () => {
-    // COMANDOS ESC/POS
-    const reset = '\x1b\x40';
-    const centro = '\x1b\x61\x01';
-    const esquerda = '\x1b\x61\x00';
-    const negritoOn = '\x1b\x45\x01';
-    const negritoOff = '\x1b\x45\x00';
-    const pulaLinha = '\n\n\n\n';
-
-    // Comando para forçar a impressora a usar a tabela de caracteres correta (Português)
-    // ESC t n (n = 2 para Code Page 850 ou n = 3 para cp860)
-    const setCodePage = '\x1b\x74\x02';
-
-    socket.write(reset);
-    socket.write(setCodePage); // Avisa a impressora: "Vou falar Português"
-
-    // 1. LOGO
-    socket.write('\x1b\x1c\x70\x01\x00');
-
-    // 2. CABEÇALHO
-    socket.write(centro);
-    socket.write(negritoOn + 'JET PIZZA DELIVERY\n' + negritoOff);
-    socket.write('--------------------------------\n');
-
-    // 3. CORPO DO PEDIDO (O PULO DO GATO ESTÁ AQUI)
-    socket.write(esquerda);
-
-    // Convertemos a string UTF-8 do WhatsApp para win1252 (ou cp850)
-    const bufferTexto = iconv.encode(texto + '\n', 'win1252');
-    socket.write(bufferTexto);
-
-    socket.write(pulaLinha);
-    socket.write('\x1d\x56\x00'); // Corte
-
-    socket.end();
-  });
-
-  socket.on('error', (err) => {
-    console.error('Erro impressora:', err.message);
-  });
-}
-
-module.exports = { imprimirPedido };
